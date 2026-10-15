@@ -1,0 +1,23 @@
+# systemd unit (alternatif Docker). Sesuaikan User dan WorkingDirectory.
+#   sudo cp deploy/lp-agent.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now lp-agent
+#   journalctl -u lp-agent -f
+[Unit]
+Description=Meteora DLMM LP agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lpagent
+WorkingDirectory=/opt/lp-agent
+EnvironmentFile=/opt/lp-agent/.env
+ExecStartPre=/usr/bin/npx prisma migrate deploy
+ExecStart=/usr/bin/node dist/main.js run
+Restart=always
+RestartSec=15
+KillSignal=SIGTERM
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

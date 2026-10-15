@@ -1,0 +1,44 @@
+{
+  "name": "lp-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Autonomous Meteora DLMM LP agent: screening, AI decision, open and close, end to end",
+  "scripts": {
+    "dev": "tsx watch src/main.ts run",
+    "start": "tsx src/main.ts run",
+    "once": "tsx src/main.ts once",
+    "status": "tsx src/main.ts status",
+    "close-all": "tsx src/main.ts close-all",
+    "open-test": "tsx src/main.ts open-test",
+    "import-legacy": "tsx src/main.ts import-legacy",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "start:prod": "node dist/main.js run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.1",
+    "@meteora-ag/dlmm": "^1.5.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "@solana/web3.js": "^1.98.0",
+    "bn.js": "^5.2.1",
+    "bs58": "^6.0.0",
+    "decimal.js": "^10.4.3",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.12.7",
+    "prisma": "^7.10.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.6",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

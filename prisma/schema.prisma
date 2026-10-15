@@ -1,0 +1,83 @@
+// Tables were first created by hand-written SQL; models map onto them so existing data stays.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Every position the bot opened. Closed ones stay as history.
+model Position {
+  pubkey       String    @id
+  poolAddress  String    @map("pool_address")
+  poolName     String    @map("pool_name")
+  tokenMint    String    @map("token_mint")
+  tokenSymbol  String    @map("token_symbol")
+  strategy     String
+  shape        String
+  binStep      Int?      @map("bin_step")
+  decidedBy    String?   @map("decided_by")
+  depositSol   Float     @map("deposit_sol")
+  paper        Boolean   @default(false)
+  /// "open" | "closed"
+  status       String    @default("open")
+  openedAt     DateTime  @map("opened_at") @db.Timestamptz(6)
+  closedAt     DateTime? @map("closed_at") @db.Timestamptz(6)
+  closeReason  String?   @map("close_reason")
+  realizedSol  Float?    @map("realized_sol")
+  /// Full TrackedPosition (exit rules, live tracking, paper simulation state).
+  data         Json
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status], map: "positions_status_idx")
+  @@index([openedAt(sort: Desc)], map: "positions_opened_idx")
+  @@map("positions")
+}
+
+/// Single row (id = 1): today's stats, pool cooldowns, paper balance.
+model BotState {
+  id              Int      @id
+  day             Json
+  closedPoolAt    Json     @map("closed_pool_at")
+  paperBalanceSol Float?   @map("paper_balance_sol")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("bot_state")
+}
+
+model JournalEntry {
+  id       BigInt   @id @default(autoincrement())
+  ts       DateTime @db.Timestamptz(6)
+  type     String
+  pool     String?
+  position String?
+  data     Json
+
+  @@index([ts(sort: Desc), id(sort: Desc)], map: "journal_ts_idx")
+  @@index([type], map: "journal_type_idx")
+  @@map("journal")
+}
+
+/// Finished bot cycles with every step, including the AI decision trace.
+model Cycle {
+  n         Int       @id
+  startedAt DateTime  @map("started_at") @db.Timestamptz(6)
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(6)
+  status    String
+  steps     Json
+
+  @@map("cycles")
+}
+
+/// Config values changed from the dashboard; they override backend/.env until reset.
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("settings")
+}
