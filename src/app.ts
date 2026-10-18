@@ -64,7 +64,7 @@ export async function buildApp(c: Container): Promise<FastifyInstance> {
   await app.register(botRoutes({ overview: c.overview, tracer: c.tracer, walletBalance: c.walletBalance }), { prefix: "/api" });
   await app.register(journalRoutes(c.journal), { prefix: "/api" });
   await app.register(
-    positionsRoutes(c.session, c.positionRepo, c.closePosition, c.onchainPositions, c.positionIl),
+    positionsRoutes(c.session, c.positionRepo, c.closePosition, c.onchainPositions, c.positionIl, c.positionChart),
     { prefix: "/api" },
   );
   await app.register(settingsRoutes(c.settings, () => c.tracer.snapshotChanged()), { prefix: "/api" });

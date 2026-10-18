@@ -23,7 +23,7 @@ const STABLES = new Set(["USDC", "USDT", "PYUSD", "USDS", "USD1", "JUPSOL", "MSO
  * One best pool per token; the other passing pools are kept as alternatives
  * so the decision step can choose a different bin step.
  */
-export function rankPools(pools: Pool[], cfg: AgentConfig): Candidate[] {
+export function rankPools(pools: Pool[], cfg: AgentConfig, hotRank?: Map<string, number>): Candidate[] {
   const s = cfg.screening;
   const now = Date.now();
   const bestPerToken = new Map<string, Candidate>();
@@ -47,6 +47,7 @@ export function rankPools(pools: Pool[], cfg: AgentConfig): Candidate[] {
     const ageH = (now - (pool.created_at || now)) / 3_600_000;
     // Pool age is a lower bound on token age; the deep check refines it with DexScreener.
     if (ageH < Math.min(s.minAgeHours, 6)) continue;
+    if (s.maxAgeHours > 0 && ageH > s.maxAgeHours) continue;
 
     const vol1h = pool.volume?.["1h"] ?? 0;
     const feeTvl24 = pool.fee_tvl_ratio?.["24h"] ?? 0;
@@ -65,6 +66,11 @@ export function rankPools(pools: Pool[], cfg: AgentConfig): Candidate[] {
     if (pool.pool_config.base_fee_pct >= 2) {
       score += 0.2;
       reasons.push(`base fee ${pool.pool_config.base_fee_pct}%`);
+    }
+    const hot = hotRank?.get(token.address);
+    if (hot !== undefined) {
+      score += 0.6 / Math.sqrt(hot);
+      reasons.push(`GMGN hot #${hot}`);
     }
 
     const list = passing.get(token.address) ?? [];

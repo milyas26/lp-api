@@ -24,7 +24,7 @@ Agent otomatis buat LP di **Meteora DLMM** (Solana). Jalan sendiri di server dar
 |---|---|---|---|
 | Baru nge-top / ketinggalan run-up | S2 wide bid-ask | BidAsk −65% (cap besar lebih sempit, bawah di bawah support 24h) | −22% / +20% / 72j |
 | Post-top, mcap ≥ $20M | S1 play the drop | BidAsk −35…−50% | −20% / +15% / 24j |
-| Udah dump ≥55% dan stabil | S10 post-dump | Spot −50% | −15% / +12% / 24j |
+| Udah dump ≥55% dan stabil | S10 post-dump | Spot −25..−35% (low 24 jam − buffer 10%) | −15% / +12% / 24j |
 | Umur ≥3 hari, ranging | S8 slow cook | Spot −40…−65% | −15% / +25% / 7 hari |
 | Run-up + volume gila (`ALLOW_AGGRESSIVE`) | S4 heart attack | Spot −20% | −6% / +8% / 2j |
 | Falling knife / volume mati | skip | | |
@@ -60,7 +60,7 @@ Isi `DEEPSEEK_API_KEY` di `.env`, AI langsung aktif (`LLM_ENABLED=false` untuk m
 | `skip_candidate` | coret kandidat (jurnal + cooldown 30 menit) |
 | `open_position` / `skip_all` | keputusan akhir |
 
-**Pagar keras** yang tidak bisa ditembus AI (dicek ulang di kode, `open_position` ditolak dan AI boleh memperbaiki): token sudah dianalisa dan dicek risiko, tidak ada danger RugCheck, PvP < 30%, fase bukan DEAD/FALLING_KNIFE, umur ≥ `MIN_AGE_HOURS`, range 15-85%, jumlah bin ≤ `MAX_BINS_PER_POSITION`, confidence ≥ 0.55, size dipotong ke batas (min `MAX_POSITION_SOL`, budget, bankroll × 1.5 × size dasar per mcap, dikurangi untuk warning RugCheck dan hari Sabtu), stop loss hanya boleh lebih ketat dari template strategi. Exit rules ikut template strategi yang dipilih. Kalau API gagal di tengah loop, tidak ada posisi baru (fail-closed). Kandidat yang sudah dianalisa saat AI memilih `skip_all` masuk cooldown 30 menit supaya tidak dibaca ulang tiap siklus.
+**Pagar keras** yang tidak bisa ditembus AI (dicek ulang di kode, `open_position` ditolak dan AI boleh memperbaiki): token sudah dianalisa dan dicek risiko, tidak ada danger RugCheck, PvP < 30%, fase bukan DEAD/FALLING_KNIFE, umur ≥ `MIN_AGE_HOURS`, range 15-85%, jumlah bin ≤ `MAX_BINS_PER_POSITION`, confidence ≥ 0.55, size dipotong ke batas (min `MAX_POSITION_SOL`, budget, bankroll × 1.5 × size dasar per mcap, dikurangi untuk warning RugCheck dan hari Sabtu), stop loss boleh antara setengah dan penuh dari template strategi (tidak boleh lebih longgar, dan tidak boleh lebih ketat dari setengah template). Exit rules ikut template strategi yang dipilih. Kalau API gagal di tengah loop, tidak ada posisi baru (fail-closed). Kandidat yang sudah dianalisa saat AI memilih `skip_all` masuk cooldown 30 menit supaya tidak dibaca ulang tiap siklus.
 
 Setiap putaran (pertimbangan AI, tiap tool, penolakan pagar, keputusan) dikirim ke dashboard sebagai langkah siklus. **Exit tidak pernah diserahkan ke LLM**: stop loss tetap rule.
 
@@ -126,6 +126,7 @@ Saat `npm start`, backend juga membuka API (Fastify) untuk [frontend](../fronten
 | `GET /api/stream` | Server-Sent Events: `hello`, `cycle` (tiap langkah berubah), `status`, `snapshot`, `ping` tiap 15 dtk |
 | `GET /api/journal?limit=100&type=close` | jurnal terbaru dulu, `type` opsional |
 | `GET /api/positions?closedLimit=50` | posisi terbuka + riwayat posisi yang sudah ditutup |
+| `GET /api/positions/:pubkey/chart` | pergerakan harga pool dipetakan ke bin posisi + tabel IL (Modul 4) dari model `paper-sim` yang sama |
 | `POST /api/opening` `{"paused": true}` | jeda / lanjutkan buka posisi baru (posisi yang ada tetap dikelola) |
 | `POST /api/positions/:pubkey/close` | tutup satu posisi sekarang (alasan `manual`). Menunggu siklus yang sedang jalan selesai dulu |
 | `GET /api/settings` | konfigurasi yang bisa diubah dari dashboard: nilai sekarang, nilai `.env`, dan apakah sedang ditimpa |

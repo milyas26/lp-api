@@ -5,6 +5,8 @@ import type { Pool } from "../../screening/domain/pool";
 import {
   STRATEGY_EXITS,
   STRATEGY_IDS,
+  POST_DUMP_RANGE_MAX_PCT,
+  POST_DUMP_RANGE_MIN_PCT,
   baseSizePct,
   type Plan,
   type StrategyId,
@@ -39,13 +41,13 @@ Playbook:
 - Syarat berurutan: volume tinggi, volatilitas dua arah (ideal ±20% per candle 5m, bukan longsor satu arah), mcap cukup (> $1M), fee/TVL tinggi, TVL tidak terlalu ramai dibanding volume.
 - Sinyal positif: tidak ada pool besar lain (porsi Meteora tinggi), base fee tinggi dengan TVL kecil, sudah selamat dari beberapa dump, retrace sehat dari ATH (10-45%), trading organik dua arah, quote-only fee di koin rawan rug.
 - Red flag: PvP, holder terkonsentrasi atau danger RugCheck lain, volume dan volatilitas memudar, harga jatuh bebas tanpa dasar ("jangan tangkap pisau, masuk saat sudah ranging"), SOL sendiri dump, masuk tepat di pucuk.
-- Fase ke shape: run-up/breakout = spot sempit (hanya kalau mode agresif); baru nge-top atau ketinggalan run-up = BidAsk lebar (-50% standar, maksimal -55%); sudah dump 60-80% dan ranging = Spot -50%; ranging berminggu-minggu dengan volume = Spot lebar slow cook; volume hilang = skip.
-- Range: -50% sampai -55% cukup untuk bot tanpa pengawasan; lebih lebar butuh terlalu banyak bin dan fee jadi encer. Cap besar (puluhan/ratusan juta) boleh lebih sempit (-35 s/d -50%). Dasar range sebaiknya di bawah support yang terlihat (low 24 jam).
+- Fase ke shape: run-up/breakout = spot sempit (hanya kalau mode agresif); baru nge-top atau ketinggalan run-up = BidAsk lebar (-50% standar, maksimal -55%); sudah dump 60-80% dan ranging = Spot -25% s/d -35% (dasar range sekitar 10% di bawah low 24 jam, lihat supportBelowPricePct); ranging berminggu-minggu dengan volume = Spot lebar slow cook; volume hilang = skip.
+- Range: BidAsk dan slow cook -50% sampai -55% cukup untuk bot tanpa pengawasan; S10 sengaja lebih sempit supaya likuiditas per bin padat dan fee lebih besar; lebih lebar butuh terlalu banyak bin dan fee jadi encer. Cap besar (puluhan/ratusan juta) boleh lebih sempit (-35 s/d -50%). Dasar range sebaiknya di bawah support yang terlihat (low 24 jam).
 - Size: kecil di cap kecil, token baru, PvP, atau koin yang bergantung pada creator/KOL; besar hanya untuk setup A+. Kalau ragu, kecilkan atau skip. Melewatkan trade tidak merugikan; rug menghabiskan posisi.
 
-Strategi (menentukan exit otomatis): S2_WIDE_BIDASK (post-top, BidAsk lebar, SL -22% TP +20% maks 72j), S1_PLAY_THE_DROP (cap ≥ $20M post-top, BidAsk -35..-50%, SL -20% TP +15% 24j), S10_POST_DUMP_SPOT (sudah dump & stabil, Spot -50%, SL -15% TP +12% 24j), S8_SLOW_COOK (umur ≥3 hari ranging, Spot -40..-55%, SL -15% TP +25% 7 hari), S4_HEART_ATTACK (run-up + volume gila, Spot -20%, SL -6% TP +8% 2j, hanya kalau diizinkan).
+Strategi (menentukan exit otomatis): S2_WIDE_BIDASK (post-top, BidAsk lebar, SL -22% TP +20% maks 72j), S1_PLAY_THE_DROP (cap ≥ $20M post-top, BidAsk -35..-50%, SL -20% TP +15% 24j), S10_POST_DUMP_SPOT (sudah dump & stabil, Spot -25..-35% mengikuti support 24 jam, SL -15% TP +12% 24j), S8_SLOW_COOK (umur ≥3 hari ranging, Spot -40..-55%, SL -15% TP +25% 7 hari), S4_HEART_ATTACK (run-up + volume gila, Spot -20%, SL -6% TP +8% 2j, hanya kalau diizinkan).
 
-Pagar keras yang dicek ulang oleh kode (open_position ditolak kalau dilanggar, kamu boleh perbaiki dan coba lagi): token harus sudah dianalisa dan dicek risiko; tidak ada danger RugCheck; PvP < 30%; fase bukan DEAD atau FALLING_KNIFE; range 15-85%; jumlah bin ≤ batas (range yang kelebihan bin otomatis dikecilkan ke range terlebar yang muat, asal tidak kurang dari 70% range yang diminta; compare_bin_steps sudah menampilkan range hasil kecilannya); size di antara minimum dan batas (size di atas batas otomatis dipotong); stop loss tidak boleh lebih longgar dari template strategi; confidence ≥ ${MIN_CONFIDENCE}.
+Pagar keras yang dicek ulang oleh kode (open_position ditolak kalau dilanggar, kamu boleh perbaiki dan coba lagi): token harus sudah dianalisa dan dicek risiko; tidak ada danger RugCheck; PvP < 30%; fase bukan DEAD atau FALLING_KNIFE; range 15-85% (S10 dipaksa ke -25..-35%); jumlah bin ≤ batas (range yang kelebihan bin otomatis dikecilkan ke range terlebar yang muat, asal tidak kurang dari 70% range yang diminta; compare_bin_steps sudah menampilkan range hasil kecilannya); size di antara minimum dan batas (size di atas batas otomatis dipotong); stop loss hanya boleh antara setengah dan penuh dari template strategi (jangan pasang SL super ketat, posisi bid-ask lebar butuh ruang napas dan fee yang menutup IL); confidence ≥ ${MIN_CONFIDENCE}.
 
 Putuskan hanya dari data yang diberikan tool. Jangan mengarang fakta. Tulis pertimbanganmu singkat (1-3 kalimat) dalam Bahasa Indonesia di setiap giliran sebelum memanggil tool. Teksmu tampil di dashboard: pakai koma atau titik, jangan tanda pisah panjang (em dash).`;
 
@@ -131,7 +133,7 @@ const TOOLS: ToolSpec[] = [
           range_pct: { type: "number" },
           size_sol: { type: "number" },
           confidence: { type: "number", description: "0..1" },
-          stop_loss_pct: { type: "number", description: "Opsional, hanya boleh lebih ketat dari template" },
+          stop_loss_pct: { type: "number", description: "Opsional, boleh lebih ketat dari template tapi tidak di bawah setengah template" },
           take_profit_pct: { type: "number", description: "Opsional, 5-60" },
           reasoning: { type: "string", description: "2-4 kalimat Bahasa Indonesia: kenapa token, bin step, range, dan size ini" },
         },
@@ -531,6 +533,9 @@ export class AiDecider implements EntryDecider {
 
     const f = a.features;
     if (f.ageHours < c.screening.minAgeHours) return `umur token ${f.ageHours.toFixed(1)} jam, minimal ${c.screening.minAgeHours}`;
+    if (c.screening.maxAgeHours > 0 && f.ageHours > c.screening.maxAgeHours) {
+      return `umur token ${f.ageHours.toFixed(1)} jam, maksimal ${c.screening.maxAgeHours}`;
+    }
     if (a.phase === "DEAD" || a.phase === "FALLING_KNIFE") return `fase ${a.phase} tidak boleh dibuka`;
 
     const strategy = str(args.strategy) as StrategyId;
@@ -539,8 +544,16 @@ export class AiDecider implements EntryDecider {
     const shape = str(args.shape) as ShapeName;
     if (!SHAPES.includes(shape)) return `shape ${shape} tidak dikenal`;
 
-    const askedRange = num(args.range_pct);
+    let askedRange = num(args.range_pct);
     if (!(askedRange >= 15 && askedRange <= 85)) return "range_pct harus 15-85";
+    let forced = "";
+    if (strategy === "S10_POST_DUMP_SPOT") {
+      const bounded = Math.min(POST_DUMP_RANGE_MAX_PCT, Math.max(POST_DUMP_RANGE_MIN_PCT, askedRange));
+      if (bounded !== askedRange) {
+        forced = ` Range S10 dipaksa dari -${askedRange}% ke -${bounded}%.`;
+        askedRange = bounded;
+      }
+    }
     const fit = fitRange(askedRange, f.binStep, c.opening.maxBinsPerPosition);
     if (!fit.ok) {
       return `range -${askedRange}% di bin step ${f.binStep} butuh ${binsForPct(askedRange, f.binStep)} bin, batas ${c.opening.maxBinsPerPosition} (paling lebar -${fit.rangePct.toFixed(0)}%). Pilih bin step lebih besar atau range lebih sempit.`;
@@ -563,7 +576,8 @@ export class AiDecider implements EntryDecider {
     const sl = num(args.stop_loss_pct);
     if (Number.isFinite(sl)) {
       if (sl > template.stopLossPct) return `stop loss ${sl}% lebih longgar dari template ${template.stopLossPct}%`;
-      exits.stopLossPct = Math.max(3, sl);
+      const slFloor = Math.max(3, Math.round(template.stopLossPct * 0.5));
+      exits.stopLossPct = Math.min(template.stopLossPct, Math.max(slFloor, sl));
     }
     const tp = num(args.take_profit_pct);
     if (Number.isFinite(tp)) exits.takeProfitPct = Math.min(60, Math.max(5, tp));
@@ -581,7 +595,7 @@ export class AiDecider implements EntryDecider {
     const narrowed = fit.shrunk ? ` Range dikecilkan dari -${askedRange}% supaya muat ${bins} bin.` : "";
     const reasoning =
       `${a.phase}: ${strategy} ${shape} -${pctForBins(bins, f.binStep).toFixed(0)}% (${bins} bin, bin step ${f.binStep}). ` +
-      `${this.label} (yakin ${Math.round(confidence * 100)}%): ${str(args.reasoning)}${clipped}${narrowed}`;
+      `${this.label} (yakin ${Math.round(confidence * 100)}%): ${str(args.reasoning)}${clipped}${forced}${narrowed}`;
 
     return {
       pool,

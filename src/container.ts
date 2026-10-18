@@ -30,6 +30,7 @@ import { ForceOpen } from "./modules/positions/application/force-open.use-case";
 import { ManagePositions } from "./modules/positions/application/manage-positions.use-case";
 import { OnchainPositions } from "./modules/positions/application/onchain-positions.use-case";
 import { OpenPosition } from "./modules/positions/application/open-position.use-case";
+import { PositionChart } from "./modules/positions/application/position-chart.use-case";
 import { PositionIl } from "./modules/positions/application/position-il.use-case";
 import { PrismaPositionRepository } from "./modules/positions/infrastructure/prisma-position.repository";
 import { CandidateSkips } from "./modules/screening/application/candidate-skips";
@@ -116,6 +117,7 @@ export async function createContainer(cfg: AgentConfig) {
     closePosition: new ClosePosition(lock, session, botStateRepo, managePositions, tracer),
     onchainPositions: new OnchainPositions(execution),
     positionIl: new PositionIl(cfg, session, execution),
+    positionChart: new PositionChart(session),
     forceOpen: new ForceOpen(cfg, session, positionRepo, execution, funds, journal, notifier),
     closeAll: new CloseAll(session, botStateRepo, managePositions, journal, tracer),
     overview: new BotOverview(cfg, session, tracer, decider, user.publicKey.toBase58(), databaseLabel(cfg.databaseUrl)),

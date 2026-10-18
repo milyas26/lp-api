@@ -12,7 +12,7 @@ import { rugReport, type RugReport } from "../../market/infrastructure/rugcheck.
 import { computeFeatures, type Features } from "../../strategy/domain/features";
 import { buildPlan, classifyPhase, type Phase, type Plan } from "../../strategy/domain/playbook";
 import { binsForPct, fitRange, pctForBins } from "../../strategy/domain/range-math";
-import { paperValue } from "../../strategy/domain/paper-sim";
+import { paperValue, rangeConcentration } from "../../strategy/domain/paper-sim";
 
 /** Pools kept per token when comparing bin steps. */
 const MAX_POOLS_PER_TOKEN = 6;
@@ -250,8 +250,8 @@ export class Research {
         filledPct: round(Math.min(1, Math.max(0, v.depth)) * 100, 0),
       };
     });
-    // Our share of fees ≈ deposit × pool fee/TVL rate, only while price is inside the range.
-    const feePerDaySol = sizeSol * (f.feeTvl24hPct / 100);
+    // Our share of fees ≈ deposit × pool fee/TVL rate × range concentration, only while in range.
+    const feePerDaySol = sizeSol * (f.feeTvl24hPct / 100) * rangeConcentration(bins, f.binStep);
     return { bins, rangePct: round(actual, 1), rows, feePerDaySol: round(feePerDaySol, 4) };
   }
 }

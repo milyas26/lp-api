@@ -103,12 +103,27 @@ export function classifyPhase(f: Features, cfg: AgentConfig): Phase {
 /** Modul 7.2 / 9.1: bigger caps → narrower range; small, fresh, risky → wider. */
 const MAX_WIDE_RANGE_PCT = 55;
 
+/** S10 spot range bounds: tight enough that fees concentrate, wide enough to cover the 24h low. */
+export const POST_DUMP_RANGE_MIN_PCT = 25;
+export const POST_DUMP_RANGE_MAX_PCT = 35;
+
+/** % below price where the range should end: 24h low with a ~10% buffer (Modul 7.3). */
+export function supportRangePct(f: Features): number {
+  return (1 - (f.low24hSol * 0.9) / f.priceSol) * 100;
+}
+
+/** S10: range bottom just under the 24h support, clamped to -25..-35%. */
+export function postDumpRangePct(f: Features): number {
+  const toSupport = supportRangePct(f);
+  return Math.min(POST_DUMP_RANGE_MAX_PCT, Math.max(POST_DUMP_RANGE_MIN_PCT, Number.isFinite(toSupport) ? toSupport : 0));
+}
+
 function bidAskWidth(f: Features, rugWarnings: number): number {
   let w = f.mcapUsd >= 100e6 ? 35 : f.mcapUsd >= 20e6 ? 45 : 50;
   if (f.ageHours < 72) w += 5;
   if (rugWarnings > 0) w += 5;
   // Modul 7.3: bottom of the range goes below visible support (24h low) with ~10% buffer.
-  const toSupport = (1 - (f.low24hSol * 0.9) / f.priceSol) * 100;
+  const toSupport = supportRangePct(f);
   if (toSupport > w && toSupport < 85) w = toSupport;
   // -55% at bin step 100 = 80 bins, so the range fits without an extended position.
   return Math.min(MAX_WIDE_RANGE_PCT, w);
@@ -155,16 +170,21 @@ export function buildPlan(
       }
       return wideBidAsk(f, phase, rugWarnings, ["post-top, bid-ask lebar set & forget"]);
 
-    case "DUMPED_RANGING":
+    case "DUMPED_RANGING": {
+      const range = postDumpRangePct(f);
       return {
         strategy: "S10_POST_DUMP_SPOT",
         phase,
         shape: "Spot",
-        rangePct: 50,
+        rangePct: range,
         sizeFactor: 0.7,
         exits: { ...STRATEGY_EXITS.S10_POST_DUMP_SPOT },
-        notes: [`drawdown ${f.drawdownFromAthPct.toFixed(0)}% & stabil → spot −50%`],
+        notes: [
+          `drawdown ${f.drawdownFromAthPct.toFixed(0)}% & stabil → spot −${range.toFixed(0)}% ` +
+            `(support 24 jam −${supportRangePct(f).toFixed(0)}% incl. buffer)`,
+        ],
       };
+    }
 
     case "MATURE_RANGING":
       return {

@@ -1,10 +1,12 @@
+import { binsForPct } from "./range-math";
 import type { ShapeName } from "./shape";
 
 /**
  * Paper-trading model of a one-sided SOL position below price (DRY_RUN).
  * Each bin i (0 = top) is a buy order at pTop·(1+s)^−i. Once price trades
  * below a bin, that bin's SOL has become token bought at the bin price.
- * Fees are estimated from the pool's realised fee/TVL while in range.
+ * Fees are estimated from the pool's realised fee/TVL while in range, scaled
+ * by how concentrated our liquidity is in the active bin (feeConcentration).
  */
 export interface PaperState {
   depositSol: number;
@@ -46,11 +48,32 @@ export function paperValue(s: PaperState, price: number): { liquiditySol: number
   return { liquiditySol: value, depth: filled === 0 ? Math.min(depth, 0) : depth };
 }
 
-/** Accrue estimated fees: our share ≈ deposit × pool fee/TVL rate, only while in range. */
+/**
+ * Pool fee/TVL is earned at the baseline density: Spot -50%, the old default
+ * width. A tighter range (or the heavy end of a Curve/BidAsk) puts more SOL in
+ * the active bin and takes a bigger share of each swap. Capped because other
+ * LPs in the same bin dilute us long before the ratio gets extreme.
+ */
+const BASELINE_RANGE_PCT = 50;
+const MAX_CONCENTRATION = 4;
+
+/** Average fee multiplier over the whole range vs the Spot -50% baseline. */
+export function rangeConcentration(bins: number, binStep: number): number {
+  return Math.min(MAX_CONCENTRATION, binsForPct(BASELINE_RANGE_PCT, binStep) / Math.max(1, bins));
+}
+
+/** Fee multiplier for the bin price sits in now; 0 outside the range. */
+export function feeConcentration(s: PaperState, depth: number): number {
+  if (depth <= 0 || depth > 1) return 0;
+  const i = Math.min(s.bins - 1, Math.floor(depth * s.bins));
+  return Math.min(MAX_CONCENTRATION, weights(s.bins, s.shape)[i] * binsForPct(BASELINE_RANGE_PCT, s.binStep));
+}
+
+/** Accrue estimated fees: deposit × pool fee/TVL rate × concentration, only while in range. */
 export function paperAccrue(s: PaperState, price: number, poolFeeTvl1hPct: number, now: number): void {
   const { depth } = paperValue(s, price);
-  const inRange = depth > 0 && depth <= 1;
+  const k = feeConcentration(s, depth);
   const hours = (now - s.lastTickAt) / 3_600_000;
-  if (inRange && hours > 0) s.feesSol += s.depositSol * (poolFeeTvl1hPct / 100) * hours;
+  if (k > 0 && hours > 0) s.feesSol += s.depositSol * (poolFeeTvl1hPct / 100) * k * hours;
   s.lastTickAt = now;
 }

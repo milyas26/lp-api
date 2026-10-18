@@ -4,7 +4,7 @@
  * Values are exposed in display units: raw = shown × scale (e.g. ms = seconds × 1000).
  */
 
-export type SettingType = "number" | "integer" | "boolean" | "list";
+export type SettingType = "number" | "integer" | "boolean" | "list" | "choice";
 
 export type SettingGroup = "cycle" | "opening" | "screening" | "risk" | "execution";
 
@@ -20,6 +20,8 @@ export interface SettingDef {
   min?: number;
   max?: number;
   scale?: number;
+  /** Allowed values for type "choice". */
+  options?: { value: string; label: string }[];
 }
 
 export const SETTING_GROUPS: { id: SettingGroup; label: string; help: string }[] = [
@@ -53,11 +55,20 @@ export const SETTING_DEFS: SettingDef[] = [
   { key: "screening.minMcapUsd", env: "MIN_MCAP_USD", group: "screening", label: "Market cap minimal", help: "", type: "number", unit: "USD", min: 0, max: 10_000_000_000 },
   { key: "screening.maxMcapUsd", env: "MAX_MCAP_USD", group: "screening", label: "Market cap maksimal", help: "Pool dengan mcap di atas ini dilewati.", type: "number", unit: "USD", min: 0, max: 10_000_000_000 },
   { key: "screening.minAgeHours", env: "MIN_AGE_HOURS", group: "screening", label: "Umur token minimal", help: "", type: "number", unit: "jam", min: 0, max: 10_000 },
+  { key: "screening.maxAgeHours", env: "MAX_AGE_HOURS", group: "screening", label: "Umur token maksimal", help: "Hanya buka token yang lebih muda dari ini. 0 berarti tanpa batas. Harus lebih besar dari umur minimal.", type: "number", unit: "jam", min: 0, max: 10_000 },
   { key: "screening.minVolume1hUsd", env: "MIN_VOLUME_1H_USD", group: "screening", label: "Volume 1 jam minimal", help: "", type: "number", unit: "USD", min: 0, max: 100_000_000 },
   { key: "screening.minFeeTvl24hPct", env: "MIN_FEE_TVL_24H_PCT", group: "screening", label: "Fee/TVL 24 jam minimal", help: "", type: "number", unit: "%", min: 0, max: 1000 },
   { key: "screening.minBinStep", env: "MIN_BIN_STEP", group: "screening", label: "Bin step minimal", help: "", type: "integer", min: 1, max: 500 },
   { key: "screening.deepCheckCount", env: "DEEP_CHECK_COUNT", group: "screening", label: "Kandidat yang dianalisa", help: "Jumlah teratas yang diteruskan ke AI atau rule engine.", type: "integer", unit: "pool", min: 1, max: 30 },
-  { key: "screening.pageSize", env: "SCREEN_PAGE_SIZE", group: "screening", label: "Pool yang diambil per siklus", help: "", type: "integer", unit: "pool", min: 20, max: 200 },
+  { key: "screening.pageSize", env: "SCREEN_PAGE_SIZE", group: "screening", label: "Pool yang diambil per siklus", help: "Dari daftar pool teratas Meteora. Hanya dipakai kalau GMGN mati atau gagal.", type: "integer", unit: "pool", min: 20, max: 200 },
+  { key: "screening.useGmgn", env: "USE_GMGN", group: "screening", label: "Token dari GMGN hot searches", help: "Kandidat diambil dari token yang sedang ramai di GMGN, lalu dicari pool DLMM-nya. Mati: pakai daftar pool teratas Meteora.", type: "boolean" },
+  { key: "screening.gmgnInterval", env: "GMGN_INTERVAL", group: "screening", label: "Jendela hot searches GMGN", help: "Ramai dalam rentang waktu ini. Pendek lebih cepat menangkap token baru naik, panjang lebih stabil.", type: "choice", options: [
+    { value: "5m", label: "5 menit" },
+    { value: "1h", label: "1 jam" },
+    { value: "6h", label: "6 jam" },
+    { value: "24h", label: "24 jam" },
+  ] },
+  { key: "screening.gmgnMaxTokens", env: "GMGN_MAX_TOKENS", group: "screening", label: "Token GMGN yang dicek", help: "Diambil dari urutan teratas hot searches.", type: "integer", unit: "token", min: 5, max: 200 },
   { key: "screening.blockedMints", env: "BLOCKED_MINTS", group: "screening", label: "Token yang diblokir", help: "Alamat mint, satu per baris. Pool dengan token ini tidak pernah dibuka.", type: "list" },
 
   // Risk and exits
@@ -92,6 +103,10 @@ export function crossCheck(get: (key: string) => unknown): string[] {
   if ((get("screening.minMcapUsd") as number) > (get("screening.maxMcapUsd") as number)) {
     errors.push("Market cap minimal tidak boleh lebih besar dari maksimal.");
   }
+  const maxAge = get("screening.maxAgeHours") as number;
+  if (maxAge > 0 && (get("screening.minAgeHours") as number) >= maxAge) {
+    errors.push("Umur token maksimal harus lebih besar dari umur minimal (atau 0 untuk tanpa batas).");
+  }
   return errors;
 }
 
@@ -100,6 +115,10 @@ export function parseSetting(def: SettingDef, input: unknown): { value: unknown 
   switch (def.type) {
     case "boolean":
       return typeof input === "boolean" ? { value: input } : { error: `${def.label}: harus ya atau tidak.` };
+    case "choice":
+      return typeof input === "string" && def.options?.some((o) => o.value === input)
+        ? { value: input }
+        : { error: `${def.label}: pilihan tidak dikenal.` };
     case "list": {
       if (!Array.isArray(input) || input.some((x) => typeof x !== "string")) {
         return { error: `${def.label}: harus daftar teks.` };

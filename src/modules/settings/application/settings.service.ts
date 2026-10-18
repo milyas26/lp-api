@@ -20,6 +20,7 @@ export interface SettingView {
   unit?: string;
   min?: number;
   max?: number;
+  options?: { value: string; label: string }[];
   /** Display units. */
   value: unknown;
   /** Value from backend/.env (or the built-in default), display units. */
@@ -96,6 +97,7 @@ export class SettingsService {
           unit: d.unit,
           min: d.min,
           max: d.max,
+          options: d.options,
           value: toDisplay(d, getPath(this.cfg, d.key)),
           envValue: toDisplay(d, this.envDefaults.get(d.key)),
           overridden: this.overridden.has(d.key),

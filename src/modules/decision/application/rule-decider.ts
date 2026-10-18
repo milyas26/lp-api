@@ -74,6 +74,9 @@ export class RuleDecider implements EntryDecider {
     if (f.ageHours < c.screening.minAgeHours) {
       return skip(`umur ${f.ageHours.toFixed(1)} jam, minimal ${c.screening.minAgeHours} jam`);
     }
+    if (c.screening.maxAgeHours > 0 && f.ageHours > c.screening.maxAgeHours) {
+      return skip(`umur ${f.ageHours.toFixed(1)} jam, maksimal ${c.screening.maxAgeHours} jam`);
+    }
 
     const phase = classifyPhase(f, c);
     step.note(`Fase ${phase}. Cek RugCheck...`);

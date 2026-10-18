@@ -45,11 +45,18 @@ export interface AgentConfig {
     minMcapUsd: number;
     maxMcapUsd: number;
     minAgeHours: number;
+    /** Only open tokens younger than this; 0 = no limit. */
+    maxAgeHours: number;
     minVolume1hUsd: number;
     minFeeTvl24hPct: number;
     minBinStep: number;
     deepCheckCount: number;
     blockedMints: string[];
+    /** Take candidate tokens from GMGN hot searches instead of Meteora's top pool lists. */
+    useGmgn: boolean;
+    gmgnInterval: string;
+    gmgnMaxTokens: number;
+    pythonBin: string;
   };
 
   risk: {
@@ -158,11 +165,16 @@ export function loadConfig(): AgentConfig {
       minMcapUsd: num("MIN_MCAP_USD", 1_000_000),
       maxMcapUsd: num("MAX_MCAP_USD", 5_000_000),
       minAgeHours: num("MIN_AGE_HOURS", 24),
+      maxAgeHours: num("MAX_AGE_HOURS", 0),
       minVolume1hUsd: num("MIN_VOLUME_1H_USD", 30_000),
       minFeeTvl24hPct: num("MIN_FEE_TVL_24H_PCT", 3),
       minBinStep: num("MIN_BIN_STEP", 50),
       deepCheckCount: num("DEEP_CHECK_COUNT", 8),
       blockedMints: list("BLOCKED_MINTS", []),
+      useGmgn: bool("USE_GMGN", true),
+      gmgnInterval: str("GMGN_INTERVAL", "1h"),
+      gmgnMaxTokens: num("GMGN_MAX_TOKENS", 50),
+      pythonBin: str("PYTHON_BIN", "python3"),
     },
 
     risk: {
